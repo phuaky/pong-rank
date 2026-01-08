@@ -18,7 +18,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onOpenLogMatch
 }) => {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col max-w-md mx-auto shadow-2xl overflow-hidden relative">
+    <div className="h-screen bg-gray-50 flex flex-col max-w-md mx-auto shadow-2xl relative">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
         <div className="flex items-center gap-2">
@@ -54,7 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({
       </div>
 
       {/* Bottom Navigation */}
-      <nav className="bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-center pb-safe sticky bottom-0 z-10">
+      <nav className="bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-center pb-safe shrink-0">
         <button 
           onClick={() => onTabChange('leaderboard')}
           className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'leaderboard' ? 'text-emerald-600' : 'text-gray-400 hover:text-gray-600'}`}

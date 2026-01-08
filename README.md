@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🏓 PongRank
 
-# Run and deploy your AI Studio app
+**Track your office ping pong battles. Settle debates. Crown champions.**
 
-This contains everything you need to run your app locally.
+Live at: [pong.phuaky.com](https://pong.phuaky.com)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1c3A9IG_MB-cA3aKwO09Sa_p2n_ruU6Ia
+---
 
-## Run Locally
+## What is this?
 
-**Prerequisites:**  Node.js
+PongRank is a simple leaderboard for your ping pong crew. Log matches, watch ratings rise and fall, and finally prove who's the real champion.
 
+Uses **ELO rating** (same system chess uses) so upsets actually matter. Beat someone ranked higher? Big gains. Lose to a newbie? Ouch.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+The "database"? Just a Google Sheet. No fancy infrastructure needed.
+
+## Features
+
+- **Leaderboard** — See who's on top
+- **Match History** — Every game recorded
+- **ELO Ratings** — Fair rankings that reward skill (and punish overconfidence)
+- **Add Players** — Get everyone in the game
+
+## For Developers
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+*Built for friendly competition. Trash talk not included.*

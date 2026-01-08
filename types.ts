@@ -13,10 +13,16 @@ export interface Match {
   id: string;
   date: string; // ISO Date string
   type: MatchType;
-  winnerIds: string[];
-  loserIds: string[];
-  score: string;
-  eloChange: number;
+  // Old format
+  winnerIds?: string[];
+  loserIds?: string[];
+  score?: string;
+  eloChange?: number;
+  // New format from API
+  teamAIds?: string[];
+  teamBIds?: string[];
+  winnerTeam?: 'A' | 'B';
+  sets?: { teamAScore: number; teamBScore: number }[];
 }
 
 export interface EloCalculationResult {

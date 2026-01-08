@@ -8,7 +8,11 @@ interface MatchHistoryProps {
 }
 
 export const MatchHistory: React.FC<MatchHistoryProps> = ({ matches, players }) => {
-  const getPlayerName = (id: string) => players.find(p => p.id === id)?.name || 'Unknown';
+  // Handle both string and number IDs for matching
+  const getPlayerName = (id: string | number) => {
+    const idStr = String(id);
+    return players.find(p => String(p.id) === idStr)?.name || 'Unknown';
+  };
 
   if (!matches || matches.length === 0) {
     return (
@@ -21,25 +25,58 @@ export const MatchHistory: React.FC<MatchHistoryProps> = ({ matches, players }) 
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-20">
+    <div className="flex flex-col gap-4 pb-4">
       {matches.map((match) => {
-        const date = new Date(match.date).toLocaleDateString(undefined, {
-          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
-        
-        // Defensive coding: ensure ids are arrays before mapping
-        const winnerIds = Array.isArray(match.winnerIds) ? match.winnerIds : [];
-        const loserIds = Array.isArray(match.loserIds) ? match.loserIds : [];
+        // Handle date - could be empty string or invalid
+        let dateStr = 'No date';
+        if (match.date) {
+          const parsedDate = new Date(match.date);
+          if (!isNaN(parsedDate.getTime())) {
+            dateStr = parsedDate.toLocaleDateString(undefined, {
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+          }
+        }
+
+        // Handle both old format (winnerIds/loserIds) and new format (teamAIds/teamBIds + winnerTeam)
+        let winnerIds: string[] = [];
+        let loserIds: string[] = [];
+
+        if (match.winnerIds && match.loserIds) {
+          // Old format
+          winnerIds = Array.isArray(match.winnerIds) ? match.winnerIds : [];
+          loserIds = Array.isArray(match.loserIds) ? match.loserIds : [];
+        } else if (match.teamAIds && match.teamBIds) {
+          // New format - determine winners based on winnerTeam
+          const teamA = Array.isArray(match.teamAIds) ? match.teamAIds.map(String) : [];
+          const teamB = Array.isArray(match.teamBIds) ? match.teamBIds.map(String) : [];
+          if (match.winnerTeam === 'A') {
+            winnerIds = teamA;
+            loserIds = teamB;
+          } else {
+            winnerIds = teamB;
+            loserIds = teamA;
+          }
+        }
 
         const winners = winnerIds.map(getPlayerName).join(' & ');
         const losers = loserIds.map(getPlayerName).join(' & ');
+
+        // Handle score - could be string or sets array
+        let scoreStr = match.score || '';
+        if (!scoreStr && match.sets && Array.isArray(match.sets)) {
+          scoreStr = match.sets.map((s: any) => `${s.teamAScore}-${s.teamBScore}`).join(', ');
+        }
+
+        // Handle eloChange - might not exist
+        const eloChange = match.eloChange || 0;
 
         return (
           <div key={match.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="flex justify-between items-start mb-3">
               <div className="text-xs font-medium text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
                 <Calendar className="w-3 h-3" />
-                {date}
+                {dateStr}
               </div>
               <div className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
                 {match.type === 'DOUBLES' ? 'Doubles' : 'Singles'}
@@ -59,11 +96,13 @@ export const MatchHistory: React.FC<MatchHistoryProps> = ({ matches, players }) 
               </div>
 
               <div className="text-right shrink-0">
-                <div className="text-lg font-bold text-gray-900">{match.score}</div>
-                <div className="text-xs font-medium text-emerald-600 flex items-center justify-end gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  {match.eloChange} Elo
-                </div>
+                <div className="text-lg font-bold text-gray-900">{scoreStr || '-'}</div>
+                {eloChange > 0 && (
+                  <div className="text-xs font-medium text-emerald-600 flex items-center justify-end gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    {eloChange} Elo
+                  </div>
+                )}
               </div>
             </div>
           </div>
