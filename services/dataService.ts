@@ -2,10 +2,11 @@ import { Match, Player } from '../types';
 import { calculateEloChange, getNewPlayerStats } from './eloUtils';
 
 const STORAGE_KEY = 'pongrank_api_url';
-// Hardcoded API URL for specific deployment (as default)
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbxOZKZB6uTqBObSpHqKS-1mQ5KoQT2FoYmjhI_XOceqY6Xh5YQY5ra0f8IRGzU28xAl/exec';
 
-// Load from storage or use default
+// API URL from environment variable (set at build time) or localStorage
+const DEFAULT_API_URL = import.meta.env.VITE_API_URL || '';
+
+// Load from storage or use default from env
 let API_URL = localStorage.getItem(STORAGE_KEY) || DEFAULT_API_URL;
 
 // Local memory cache for optimistic updates and read access
