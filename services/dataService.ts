@@ -38,6 +38,7 @@ export const fetchData = async (): Promise<{players: Player[], matches: Match[]}
     // Validate and Clean Data
     const validPlayers = Array.isArray(data.players) ? data.players.map((p: any) => ({
       ...p,
+      id: String(p.id),  // Convert numeric ID to string for consistent lookups
       elo: typeof p.elo === 'number' ? p.elo : Number(p.elo) || 1200,
       wins: typeof p.wins === 'number' ? p.wins : Number(p.wins) || 0,
       losses: typeof p.losses === 'number' ? p.losses : Number(p.losses) || 0,
