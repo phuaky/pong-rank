@@ -8,7 +8,8 @@
       "Bash(gh api:*)",
       "Bash(gh run list:*)",
       "Bash(gh run watch:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(xargs gh run watch:*)"
     ]
   }
 }

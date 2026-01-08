@@ -42,11 +42,11 @@ export const MatchHistory: React.FC<MatchHistoryProps> = ({ matches, players }) 
         let winnerIds: string[] = [];
         let loserIds: string[] = [];
 
-        if (match.winnerIds && match.loserIds) {
-          // Old format
-          winnerIds = Array.isArray(match.winnerIds) ? match.winnerIds : [];
-          loserIds = Array.isArray(match.loserIds) ? match.loserIds : [];
-        } else if (match.teamAIds && match.teamBIds) {
+        if (match.winnerIds?.length && match.loserIds?.length) {
+          // Old format - has actual winner/loser IDs
+          winnerIds = match.winnerIds;
+          loserIds = match.loserIds;
+        } else if (match.teamAIds?.length && match.teamBIds?.length) {
           // New format - determine winners based on winnerTeam
           const teamA = Array.isArray(match.teamAIds) ? match.teamAIds.map(String) : [];
           const teamB = Array.isArray(match.teamBIds) ? match.teamBIds.map(String) : [];
