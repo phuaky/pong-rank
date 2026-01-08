@@ -62,19 +62,21 @@ export const fetchData = async (): Promise<{players: Player[], matches: Match[]}
   }
 };
 
-// Helper to push full state to backend
-const syncData = async (players: Player[], matches: Match[]) => {
+// Helper for API calls
+const apiCall = async (body: object) => {
   if (!API_URL) throw new Error("API URL is not configured");
-
-  // Optimistically update cache
-  cachedPlayers = players;
-  cachedMatches = matches;
-
-  // Send to backend
-  await fetch(API_URL, {
+  const res = await fetch(API_URL, {
     method: 'POST',
-    body: JSON.stringify({ players, matches }),
+    body: JSON.stringify(body),
   });
+  return res.json();
+};
+
+// Update multiple players (e.g., after a match)
+const updatePlayers = async (players: Player[]) => {
+  for (const player of players) {
+    await apiCall({ action: 'updatePlayer', player });
+  }
 };
 
 export const getPlayers = (): Player[] => {
@@ -94,9 +96,13 @@ export const addPlayer = async (name: string): Promise<Player> => {
     losses: 0,
     createdAt: new Date().toISOString(),
   };
-  
-  const updatedPlayers = [...cachedPlayers, newPlayer];
-  await syncData(updatedPlayers, cachedMatches);
+
+  // Add to backend
+  await apiCall({ action: 'addPlayer', player: newPlayer });
+
+  // Update local cache
+  cachedPlayers = [...cachedPlayers, newPlayer];
+
   return newPlayer;
 };
 
@@ -110,7 +116,7 @@ export const logMatch = async (
   const currentPlayers = [...cachedPlayers];
   const winners = currentPlayers.filter(p => winnerIds.includes(p.id));
   const losers = currentPlayers.filter(p => loserIds.includes(p.id));
-  
+
   if (winners.length === 0 || losers.length === 0) {
     throw new Error("Invalid players selected");
   }
@@ -131,7 +137,7 @@ export const logMatch = async (
     eloChange,
   };
 
-  // 4. Update Players locally
+  // 4. Update Players
   const updatedPlayers = currentPlayers.map(p => {
     if (winnerIds.includes(p.id)) {
       return getNewPlayerStats(p, true, eloChange);
@@ -142,10 +148,24 @@ export const logMatch = async (
     return p;
   });
 
-  // 5. Sync
-  // Prepend match to history
-  const updatedMatches = [newMatch, ...cachedMatches];
-  await syncData(updatedPlayers, updatedMatches);
+  // 5. Add match to backend (appends to end)
+  await apiCall({ action: 'addMatch', match: newMatch });
+
+  // 6. Update player stats in backend
+  const playersToUpdate = updatedPlayers.filter(p =>
+    winnerIds.includes(p.id) || loserIds.includes(p.id)
+  );
+  await updatePlayers(playersToUpdate);
+
+  // 7. Update local cache
+  cachedMatches = [...cachedMatches, newMatch]; // Append to end (newest last)
+  cachedPlayers = updatedPlayers;
 
   return newMatch;
+};
+
+// Delete a match by ID
+export const deleteMatch = async (matchId: string): Promise<void> => {
+  await apiCall({ action: 'deleteMatch', matchId });
+  cachedMatches = cachedMatches.filter(m => m.id !== matchId);
 };
