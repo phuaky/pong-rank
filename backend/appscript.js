@@ -137,6 +137,11 @@ function handleAddMatch(ss, match) {
   // Append new row at the END (newest last)
   const newRow = headers.map(h => {
     const val = match[h];
+    // Prefix score with single quote to prevent Google Sheets date interpretation
+    // "11-8" would otherwise be interpreted as November 8th
+    if (h === 'score' && typeof val === 'string' && val) {
+      return "'" + val;
+    }
     return (typeof val === 'object') ? JSON.stringify(val) : (val ?? '');
   });
   sheet.appendRow(newRow);
@@ -259,10 +264,27 @@ function parseData(values) {
   return values.slice(1).map(row => {
     let obj = {};
     headers.forEach((h, i) => {
+      let val = row[i];
+
+      // Handle Date objects - Google Sheets converts "11-8" to dates!
+      // Check if it's a Date object and convert appropriately
+      if (val instanceof Date) {
+        // For 'score' column, this was likely "11-8" interpreted as a date
+        // Extract month-day as the score
+        if (h === 'score') {
+          const month = val.getMonth() + 1; // 0-indexed
+          const day = val.getDate();
+          val = month + '-' + day;
+        } else {
+          // For actual date fields, convert to ISO string
+          val = val.toISOString();
+        }
+      }
+
       try {
-        obj[h] = JSON.parse(row[i]);
+        obj[h] = JSON.parse(val);
       } catch (e) {
-        obj[h] = row[i];
+        obj[h] = val;
       }
     });
     return obj;
@@ -421,7 +443,20 @@ function migrateMatchesToNewFormat() {
       // Already in new format
       winnerIds = existingWinnerIds;
       loserIds = existingLoserIds;
-      score = idx['score'] !== undefined ? (row[idx['score']] || '') : '';
+
+      // Handle score - may be a Date object if Google Sheets interpreted "11-8" as Nov 8
+      let existingScore = idx['score'] !== undefined ? row[idx['score']] : '';
+      if (existingScore instanceof Date) {
+        // Convert date back to score format
+        const month = existingScore.getMonth() + 1;
+        const day = existingScore.getDate();
+        existingScore = "'" + month + '-' + day;
+      } else if (existingScore && typeof existingScore === 'string' && !existingScore.startsWith("'")) {
+        // Prefix with quote if not already
+        existingScore = "'" + existingScore;
+      }
+      score = existingScore || '';
+
       eloChange = idx['eloChange'] !== undefined ? (row[idx['eloChange']] || 0) : 0;
       migratedCount++;
     }
@@ -447,12 +482,13 @@ function migrateMatchesToNewFormat() {
         }
 
         // Extract score from first set
+        // Prefix with single quote to prevent Google Sheets date interpretation
         if (sets && sets.length > 0) {
           const s = sets[0];
           if (winnerTeam === 'A') {
-            score = s.teamAScore + '-' + s.teamBScore;
+            score = "'" + s.teamAScore + '-' + s.teamBScore;
           } else {
-            score = s.teamBScore + '-' + s.teamAScore;
+            score = "'" + s.teamBScore + '-' + s.teamAScore;
           }
         } else {
           score = '';
