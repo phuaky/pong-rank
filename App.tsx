@@ -56,7 +56,7 @@ function App() {
   if (isLogMatchOpen) {
     return (
       <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col max-w-md mx-auto shadow-2xl">
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-hidden min-h-0">
           <LogMatch 
             players={players} 
             onMatchLogged={handleMatchLogged} 
@@ -70,7 +70,7 @@ function App() {
   if (isAddPlayerOpen) {
     return (
       <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col max-w-md mx-auto shadow-2xl">
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 overflow-hidden min-h-0">
           <AddPlayer 
             onPlayerAdded={handlePlayerAdded} 
             onCancel={() => setIsAddPlayerOpen(false)} 

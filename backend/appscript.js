@@ -19,6 +19,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('PongRank')
     .addItem('Recalculate All Stats', 'recalculateAllStats')
+    .addItem('Migrate to New Format', 'migrateMatchesToNewFormat')
     .addToUi();
 }
 
@@ -370,4 +371,125 @@ function recalculateAllStats() {
   pSheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
 
   SpreadsheetApp.getUi().alert('Stats recalculated for ' + updatedPlayers.length + ' players from ' + matches.length + ' matches!');
+}
+
+// ============ Migrate Matches to New Format ============
+// Converts old format (teamAIds/teamBIds/winnerTeam) to new format (winnerIds/loserIds/score/eloChange)
+function migrateMatchesToNewFormat() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Matches');
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('No Matches sheet found!');
+    return;
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    SpreadsheetApp.getUi().alert('No matches to migrate!');
+    return;
+  }
+
+  const oldHeaders = data[0];
+  const newHeaders = ['id', 'date', 'type', 'winnerIds', 'loserIds', 'score', 'eloChange'];
+
+  // Find column indices
+  const idx = {};
+  oldHeaders.forEach((h, i) => idx[h] = i);
+
+  const newRows = [newHeaders];
+  let migratedCount = 0;
+  let skippedCount = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const id = row[idx['id']];
+    const date = row[idx['date']];
+    const type = row[idx['type']];
+
+    // Skip empty rows
+    if (!id) continue;
+
+    let winnerIds, loserIds, score, eloChange;
+
+    // Check if already new format (has winnerIds and loserIds)
+    const existingWinnerIds = idx['winnerIds'] !== undefined ? row[idx['winnerIds']] : null;
+    const existingLoserIds = idx['loserIds'] !== undefined ? row[idx['loserIds']] : null;
+
+    if (existingWinnerIds && existingLoserIds) {
+      // Already in new format
+      winnerIds = existingWinnerIds;
+      loserIds = existingLoserIds;
+      score = idx['score'] !== undefined ? (row[idx['score']] || '') : '';
+      eloChange = idx['eloChange'] !== undefined ? (row[idx['eloChange']] || 0) : 0;
+      migratedCount++;
+    }
+    // Convert from old format
+    else if (row[idx['teamAIds']] && row[idx['teamBIds']]) {
+      try {
+        const teamAIds = typeof row[idx['teamAIds']] === 'string'
+          ? JSON.parse(row[idx['teamAIds']])
+          : row[idx['teamAIds']];
+        const teamBIds = typeof row[idx['teamBIds']] === 'string'
+          ? JSON.parse(row[idx['teamBIds']])
+          : row[idx['teamBIds']];
+        const winnerTeam = row[idx['winnerTeam']];
+        const setsRaw = row[idx['sets']];
+        const sets = setsRaw ? (typeof setsRaw === 'string' ? JSON.parse(setsRaw) : setsRaw) : [];
+
+        if (winnerTeam === 'A') {
+          winnerIds = JSON.stringify(teamAIds);
+          loserIds = JSON.stringify(teamBIds);
+        } else {
+          winnerIds = JSON.stringify(teamBIds);
+          loserIds = JSON.stringify(teamAIds);
+        }
+
+        // Extract score from first set
+        if (sets && sets.length > 0) {
+          const s = sets[0];
+          if (winnerTeam === 'A') {
+            score = s.teamAScore + '-' + s.teamBScore;
+          } else {
+            score = s.teamBScore + '-' + s.teamAScore;
+          }
+        } else {
+          score = '';
+        }
+
+        eloChange = 16; // Default, will be recalculated
+        migratedCount++;
+      } catch (e) {
+        // Failed to parse, skip this row
+        winnerIds = '';
+        loserIds = '';
+        score = '';
+        eloChange = '';
+        skippedCount++;
+      }
+    }
+    // Broken rows (no old or new format data)
+    else {
+      winnerIds = '';
+      loserIds = '';
+      score = '';
+      eloChange = '';
+      skippedCount++;
+    }
+
+    newRows.push([id, date, type, winnerIds, loserIds, score, eloChange]);
+  }
+
+  // Clear and rewrite
+  sheet.clear();
+  sheet.getRange(1, 1, newRows.length, newHeaders.length).setValues(newRows);
+
+  SpreadsheetApp.getUi().alert(
+    'Migration complete!\n\n' +
+    'Migrated: ' + migratedCount + ' matches\n' +
+    'Skipped (broken): ' + skippedCount + ' matches\n\n' +
+    'New columns: id, date, type, winnerIds, loserIds, score, eloChange\n\n' +
+    'Run "Recalculate All Stats" to fix ELO values.'
+  );
 }
