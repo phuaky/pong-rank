@@ -1,6 +1,10 @@
+'use client';
+
 import React, { ReactNode } from 'react';
-import { Tab } from '../types';
-import { Trophy, History, PlusCircle, Info, UserPlus } from 'lucide-react';
+import Image from 'next/image';
+import { Tab } from '@/types';
+import { Trophy, History, PlusCircle, Info, UserPlus, LogOut, LogIn, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,24 +21,65 @@ export const Layout: React.FC<LayoutProps> = ({
   onOpenAddPlayer,
   onOpenLogMatch
 }) => {
+  const { user, loading, signIn, signOutUser } = useAuth();
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col max-w-md mx-auto shadow-2xl relative">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <div className="bg-emerald-600 text-white p-1.5 rounded-lg">
             <Trophy className="w-5 h-5" />
           </div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">PongRank</h1>
         </div>
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={onOpenAddPlayer}
-            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-            aria-label="Add Player"
-          >
-            <UserPlus className="w-6 h-6" />
-          </button>
+        
+        <div className="flex items-center gap-2">
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          ) : user ? (
+            <>
+              {/* User info */}
+              <div className="flex items-center gap-2">
+                {user.photoURL && (
+                  <Image 
+                    src={user.photoURL} 
+                    alt={user.displayName || 'User'} 
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                )}
+                <span className="text-sm font-medium text-gray-700 hidden sm:block max-w-[100px] truncate">
+                  {user.displayName?.split(' ')[0]}
+                </span>
+              </div>
+              
+              <button 
+                onClick={onOpenAddPlayer}
+                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                aria-label="Add Player"
+              >
+                <UserPlus className="w-5 h-5" />
+              </button>
+              
+              <button 
+                onClick={signOutUser}
+                className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={signIn}
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -43,15 +88,17 @@ export const Layout: React.FC<LayoutProps> = ({
         {children}
       </main>
 
-      {/* Floating Action Button (FAB) for logging match */}
-      <div className="absolute bottom-24 right-6 z-20">
-        <button 
-          onClick={onOpenLogMatch}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg shadow-emerald-600/30 transition-all active:scale-95 flex items-center justify-center"
-        >
-          <PlusCircle className="w-8 h-8" />
-        </button>
-      </div>
+      {/* Floating Action Button (FAB) for logging match - only show if signed in */}
+      {user && (
+        <div className="absolute bottom-24 right-6 z-20">
+          <button 
+            onClick={onOpenLogMatch}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg shadow-emerald-600/30 transition-all active:scale-95 flex items-center justify-center"
+          >
+            <PlusCircle className="w-8 h-8" />
+          </button>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-center pb-safe shrink-0">

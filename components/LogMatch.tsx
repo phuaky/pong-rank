@@ -1,9 +1,12 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Player, MatchType } from '../types';
+import { Player, MatchType } from '@/types';
 import { Button } from './Button';
 import { Input } from './Input';
-import { UserPlus, UserMinus, Trophy, XCircle, Loader2 } from 'lucide-react';
-import { logMatch } from '../services/dataService';
+import { UserPlus, UserMinus, Trophy, XCircle, Loader2, CheckCircle } from 'lucide-react';
+import { logMatch } from '@/lib/dataService';
+import { useAuth } from '@/lib/AuthContext';
 
 interface LogMatchProps {
   players: Player[];
@@ -12,6 +15,7 @@ interface LogMatchProps {
 }
 
 export const LogMatch: React.FC<LogMatchProps> = ({ players, onMatchLogged, onCancel }) => {
+  const { getToken, user } = useAuth();
   const [matchType, setMatchType] = useState<MatchType>('SINGLES');
   const [winnerIds, setWinnerIds] = useState<string[]>([]);
   const [loserIds, setLoserIds] = useState<string[]>([]);
@@ -19,20 +23,18 @@ export const LogMatch: React.FC<LogMatchProps> = ({ players, onMatchLogged, onCa
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [txStatus, setTxStatus] = useState<'idle' | 'pending' | 'confirmed'>('idle');
 
   const handlePlayerSelect = (id: string, isWinner: boolean) => {
-    // Clear selection if already selected in the other group
     if (isWinner && loserIds.includes(id)) setLoserIds(prev => prev.filter(pid => pid !== id));
     if (!isWinner && winnerIds.includes(id)) setWinnerIds(prev => prev.filter(pid => pid !== id));
 
     const targetSet = isWinner ? setWinnerIds : setLoserIds;
     const targetState = isWinner ? winnerIds : loserIds;
 
-    // Toggle logic
     if (targetState.includes(id)) {
       targetSet(prev => prev.filter(pid => pid !== id));
     } else {
-      // Limit selection based on match type
       const limit = matchType === 'SINGLES' ? 1 : 2;
       if (targetState.length < limit) {
         targetSet(prev => [...prev, id]);
@@ -55,16 +57,45 @@ export const LogMatch: React.FC<LogMatchProps> = ({ players, onMatchLogged, onCa
       setError('Please enter a valid score (e.g., 11-9)');
       return;
     }
+
+    if (!user) {
+      setError('You must be signed in to log matches');
+      return;
+    }
     
     setIsSubmitting(true);
+    setTxStatus('pending');
+    setError(null);
+    
     try {
-      await logMatch(matchType, winnerIds, loserIds, score);
-      onMatchLogged();
-    } catch (e) {
-      setError('Failed to log match. Check connection.');
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      await logMatch(matchType, winnerIds, loserIds, score, token);
+      setTxStatus('confirmed');
+      
+      // Brief delay to show confirmation
+      setTimeout(() => {
+        onMatchLogged();
+      }, 1500);
+    } catch (e: any) {
+      setError(e.message || 'Failed to log match. Please try again.');
+      setTxStatus('idle');
       setIsSubmitting(false);
     }
   };
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-2xl shadow-sm">
+        <UserPlus className="w-12 h-12 text-gray-300 mb-4" />
+        <p className="text-gray-600 mb-4">You need to sign in to log matches.</p>
+        <Button onClick={onCancel}>Go Back</Button>
+      </div>
+    );
+  }
 
   if (players.length < 2) {
     return (
@@ -208,6 +239,13 @@ export const LogMatch: React.FC<LogMatchProps> = ({ players, onMatchLogged, onCa
         </div>
       )}
 
+      {txStatus === 'confirmed' && (
+        <div className="bg-emerald-50 text-emerald-600 p-3 rounded-lg text-sm mb-4 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          Match recorded on blockchain!
+        </div>
+      )}
+
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-6">
         <Input 
           autoFocus
@@ -234,11 +272,19 @@ export const LogMatch: React.FC<LogMatchProps> = ({ players, onMatchLogged, onCa
         </div>
       </div>
 
+      {txStatus === 'pending' && (
+        <div className="bg-blue-50 p-4 rounded-xl mb-6 text-center">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+          <p className="text-sm text-blue-700">Recording match on Sepolia blockchain...</p>
+          <p className="text-xs text-blue-500">This may take a few seconds</p>
+        </div>
+      )}
+
       <div className="mt-auto flex gap-3">
         <Button variant="secondary" className="flex-1" onClick={() => setStep(2)} disabled={isSubmitting}>Back</Button>
         <Button className="flex-1 flex items-center justify-center gap-2" onClick={handleSubmit} disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isSubmitting ? 'Confirming...' : 'Confirm Match'}
+          {isSubmitting ? 'Recording...' : 'Confirm Match'}
         </Button>
       </div>
     </div>
