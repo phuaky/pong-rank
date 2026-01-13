@@ -4,16 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PongRank is a ping pong leaderboard app that tracks matches and player ELO ratings. Data is stored in Google Sheets via a Google Apps Script backend.
+PongRank is a ping pong leaderboard app that tracks matches and player ELO ratings with blockchain verification on Ethereum Sepolia testnet. User authentication is handled via Firebase Google Sign-In.
 
 Live at: https://pong.phuaky.com
 
 ## Commands
 
 ```bash
-npm run dev      # Start dev server on port 3000
-npm run build    # Build for production
-npm run preview  # Preview production build
+# Development
+bun install          # Install dependencies
+bun dev              # Start Next.js dev server
+bun run build        # Build for production
+bun start            # Start production server
+
+# Smart Contracts (in /contracts directory)
+cd contracts
+forge build          # Compile contracts
+forge test           # Run tests
+forge test -vvv      # Run tests with verbose output
+
+# Deploy to Sepolia (requires SIGNER_PRIVATE_KEY and SEPOLIA_RPC_URL)
+forge script script/Deploy.s.sol:DeployPongRank --rpc-url $SEPOLIA_RPC_URL --broadcast
 ```
 
 ## Architecture
@@ -21,75 +32,96 @@ npm run preview  # Preview production build
 ### Data Flow
 
 ```
-React App → dataService.ts → Google Apps Script API → Google Sheets
+User → Google Auth (Firebase) → Next.js API Routes → Smart Contract (Sepolia) + Firestore
 ```
 
-- **Frontend**: React 19 + Vite + TypeScript
-- **Backend**: Google Apps Script web app (deployed separately)
-- **Storage**: Google Sheets as database
-- **Styling**: Tailwind CSS (via CDN in index.html)
+- **Frontend**: Next.js 14 + React 18 + TypeScript + Tailwind CSS
+- **Authentication**: Firebase Google Sign-In
+- **Backend**: Next.js API Routes
+- **On-chain Storage**: Solidity smart contract on Sepolia testnet
+- **Off-chain Storage**: Firebase Firestore (user metadata, match metadata)
 
-### Key Files
+### Project Structure
 
-- `services/dataService.ts` - All API calls and local caching. Uses optimistic updates with in-memory cache (`cachedPlayers`, `cachedMatches`).
-- `services/eloUtils.ts` - ELO calculation logic (K-factor = 32)
-- `types.ts` - TypeScript interfaces for `Player`, `Match`, `MatchType`, `Tab`
+```
+/app                    # Next.js app router
+  /api                  # API routes
+    /auth/register      # User registration endpoint
+    /players            # Player CRUD
+    /matches            # Match logging
+  /page.tsx             # Main page
+  /layout.tsx           # Root layout
+/components             # React components
+/contracts              # Foundry smart contract project
+  /src/PongRank.sol     # Main smart contract
+  /test/PongRank.t.sol  # Contract tests
+  /script/Deploy.s.sol  # Deployment script
+/lib                    # Utility libraries
+  /firebase.ts          # Firebase client config
+  /firebaseAdmin.ts     # Firebase admin SDK
+  /blockchain.ts        # Ethers.js contract interactions
+  /firestoreService.ts  # Firestore database operations
+  /dataService.ts       # Client-side data fetching
+  /eloUtils.ts          # ELO calculation logic
+  /AuthContext.tsx      # React auth context
+/types.ts               # TypeScript interfaces
+```
 
 ### Data Models
 
-**Player**: id, name, elo (starts at 1200), wins, losses, createdAt
+**Player** (Hybrid - on-chain + Firestore):
+- On-chain: id (bytes32), elo, wins, losses
+- Firestore: name, email, photoURL, firebaseUid, createdAt
 
-**Match**: id, date, type (SINGLES/DOUBLES), winnerIds[], loserIds[], score, eloChange
+**Match** (Hybrid - on-chain + Firestore):
+- On-chain: id (bytes32), winnerIds[], loserIds[], eloChange, timestamp
+- Firestore: score, type (SINGLES/DOUBLES), txHash
 
-### Google Sheets Schema
+### Smart Contract
 
-The backend uses two sheets in Google Sheets:
+The `PongRank.sol` contract stores:
+- Player ELO ratings and win/loss records
+- Match results with ELO changes
+- Only the owner (server wallet) can write; anyone can read
 
-**Players Sheet**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | string | UUID |
-| name | string | Player display name |
-| elo | number | ELO rating (starts at 1200) |
-| wins | number | Total wins |
-| losses | number | Total losses |
-| createdAt | string | ISO timestamp |
+Key functions:
+- `registerPlayer(bytes32 playerId)` - Register new player with 1200 ELO
+- `logMatch(...)` - Record match and update player stats
+- `getPlayer(bytes32)` / `getMatch(bytes32)` - Read data
 
-**Matches Sheet**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | string | UUID |
-| date | string | ISO timestamp |
-| type | string | "SINGLES" or "DOUBLES" |
-| winnerIds | JSON | Array of winner player IDs, e.g. `["id1"]` or `["id1","id2"]` |
-| loserIds | JSON | Array of loser player IDs |
-| score | string | Score like "11-8" (winner-loser). Prefixed with `'` to prevent Sheets date interpretation |
-| eloChange | number | ELO points exchanged |
+### Environment Variables
 
-**Note**: Scores like "11-8" get interpreted as dates by Google Sheets. The backend prefixes them with `'` when writing and handles Date objects when reading.
+See `.env.example` for required variables:
+- Firebase client config (NEXT_PUBLIC_FIREBASE_*)
+- Firebase admin credentials (FIREBASE_ADMIN_*)
+- Blockchain config (SIGNER_PRIVATE_KEY, SEPOLIA_RPC_URL, NEXT_PUBLIC_CONTRACT_ADDRESS)
 
-### Environment
+### Server Wallet
 
-Set `VITE_API_URL` to your Google Apps Script deployment URL. Users can also set the API URL at runtime via localStorage.
-
-## Backend (Google Apps Script)
-
-The backend lives in `backend/appscript.js`. To deploy changes:
-
-1. Open the Google Apps Script editor for the project
-2. Copy/paste the contents of `backend/appscript.js`
-3. Deploy as web app (Execute as: Me, Access: Anyone)
-
-### Google Sheets Menu
-
-The script adds a **PongRank** menu to Google Sheets with:
-
-- **Recalculate All Stats** - Rebuilds all player ELO/wins/losses from match history. Use when stats get out of sync.
-- **Migrate to New Format** - Converts old match format (teamAIds/teamBIds/winnerTeam) to new format (winnerIds/loserIds/score/eloChange).
+The backend uses a dedicated wallet for all blockchain transactions:
+- Private key stored in `SIGNER_PRIVATE_KEY` environment variable
+- Must be funded with Sepolia ETH from a faucet
+- Signs and sends transactions on behalf of users (gasless UX)
 
 ## Deployment
 
-GitHub Pages via `.github/workflows/deploy.yml`. Pushes to `main` trigger automatic deployment.
+### Deploy Smart Contract
+
+1. Fund your server wallet with Sepolia ETH
+2. Set environment variables
+3. Deploy:
+   ```bash
+   cd contracts
+   forge script script/Deploy.s.sol:DeployPongRank --rpc-url $SEPOLIA_RPC_URL --broadcast
+   ```
+4. Copy the deployed contract address to `NEXT_PUBLIC_CONTRACT_ADDRESS`
+
+### Deploy Next.js App
+
+1. Create Firebase project and enable Google Auth
+2. Create Firestore database
+3. Set all environment variables
+4. Deploy to Vercel or similar
 
 ## Contributing
 
