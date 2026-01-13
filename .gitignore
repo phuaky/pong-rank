@@ -28,4 +28,10 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Next.js
 .next
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
